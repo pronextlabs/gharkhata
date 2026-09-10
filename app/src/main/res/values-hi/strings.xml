@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">घरखाता</string>
+    <string name="tagline">आपका अपना हिसाब किताब</string>
+    <string name="tab_today">आज का हिसाब</string>
+    <string name="tab_services">घर के काम</string>
+    <string name="tab_savings">बचत और तिजोरी</string>
+    <string name="tab_settings">सेटिंग्स</string>
+    
+    <!-- Daily Spend -->
+    <string name="daily_safe_spend">आज का सुरक्षित खर्च</string>
+    <string name="days_remaining_format">%d दिन बचे हैं इस महीने में</string>
+    <string name="saved_so_far">अब तक की बचत</string>
+    
+    <!-- Actions -->
+    <string name="save_transaction">✓ जोड़ दिया</string>
+    <string name="undo">वापस करें</string>
+    <string name="transaction_saved">हिसाब जोड़ दिया गया!</string>
+    
+    <!-- Categories -->
+    <string name="cat_vegetables">सब्जी मंडी</string>
+    <string name="cat_groceries">किराना / राशन</string>
+    <string name="cat_milk">दूध और डेयरी</string>
+    <string name="cat_maid">कामवाली / बाई</string>
+    <string name="cat_gas">गैस सिलेंडर</string>
+    <string name="cat_kids">बच्चों की पढ़ाई</string>
+    <string name="cat_medical">दवाई और डॉक्टर</string>
+    <string name="cat_pooja">पूजा और शगुन</string>
+
+    <!-- Services -->
+    <string name="milk_tally">दूध का हिसाब</string>
+    <string name="maid_attendance">कामवाली का हिसाब</string>
+    <string name="cylinder_tracker">गैस सिलेंडर</string>
+    <string name="full_liter">1 लीटर</string>
+    <string name="half_liter">1.5 लीटर</string>
+    <string name="no_milk">दूध बंद</string>
+</resources>

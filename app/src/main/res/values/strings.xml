@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">GharKhata</string>
+    <string name="tagline">Apka Apna Hisaab Kitab</string>
+    <string name="tab_today">Aaj Ka Hisaab</string>
+    <string name="tab_services">Ghar Ke Kaam</string>
+    <string name="tab_savings">Bachat &amp; Tijori</string>
+    <string name="tab_settings">Settings</string>
+    
+    <!-- Daily Spend -->
+    <string name="daily_safe_spend">Aaj Ka Safe Kharcha</string>
+    <string name="days_remaining_format">%d din bache hain is mahine mein</string>
+    <string name="saved_so_far">Ab tak ki bachat</string>
+    
+    <!-- Actions -->
+    <string name="save_transaction">✓ Jod Diya</string>
+    <string name="undo">Wapas Karein</string>
+    <string name="transaction_saved">Hisaab jod diya gaya!</string>
+    
+    <!-- Categories -->
+    <string name="cat_vegetables">Sabzi Mandi</string>
+    <string name="cat_groceries">Kirana / Ration</string>
+    <string name="cat_milk">Doodh &amp; Dairy</string>
+    <string name="cat_maid">Kamwali / Bai</string>
+    <string name="cat_gas">Gas Cylinder</string>
+    <string name="cat_kids">Baccho Ki Padhai</string>
+    <string name="cat_medical">Dawai &amp; Doctor</string>
+    <string name="cat_pooja">Pooja &amp; Shagun</string>
+
+    <!-- Services -->
+    <string name="milk_tally">Doodh Ka Hisaab</string>
+    <string name="maid_attendance">Kamwali Ka Hisaab</string>
+    <string name="cylinder_tracker">Gas Cylinder</string>
+    <string name="full_liter">1 Litre</string>
+    <string name="half_liter">1.5 Litre</string>
+    <string name="no_milk">Doodh Bandh</string>
+</resources>
