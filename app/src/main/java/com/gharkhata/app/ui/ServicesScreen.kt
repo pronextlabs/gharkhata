@@ -3,10 +3,8 @@ package com.gharkhata.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,10 +33,11 @@ fun ServicesScreen(
     val daysInMonth = remember { today.lengthOfMonth() }
     val monthName = remember { today.month.name.lowercase().replaceFirstChar { it.uppercase() } }
 
+    // Milk logs initialized to 0L (no fake pre-filled data)
     val milkLogs = remember {
         mutableStateListOf<MilkBottleLog>().apply {
             for (day in 1..daysInMonth) {
-                add(MilkBottleLog(dayOfMonth = day, dateEpochDay = day.toLong(), status = MilkStatus.FULL_LITER))
+                add(MilkBottleLog(dayOfMonth = day, dateEpochDay = day.toLong(), status = MilkStatus.NO_MILK))
             }
         }
     }
@@ -127,7 +126,7 @@ fun ServicesScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // --- 1-Tap Calendar Grid with Bottle Symbols ---
-            Text(text = "Din Par Tap Karein (1L -> 1.5L -> Bandh)", fontSize = 12.sp, color = GharKhataColors.TextSecondary)
+            Text(text = "Din Par Tap Karein (1L -> 1.5L -> 2L -> 0L)", fontSize = 12.sp, color = GharKhataColors.TextSecondary)
             Spacer(modifier = Modifier.height(6.dp))
 
             LazyVerticalGrid(
@@ -138,14 +137,14 @@ fun ServicesScreen(
             ) {
                 items(milkLogs.size) { index ->
                     val log = milkLogs[index]
-                    val isBandh = log.status == MilkStatus.NO_MILK
+                    val isZero = log.status == MilkStatus.NO_MILK
                     val isExtra = log.status == MilkStatus.LITER_AND_HALF || log.status == MilkStatus.TWO_LITERS
 
                     Column(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                if (isBandh) GharKhataColors.ExpenseRedLight
+                                if (isZero) GharKhataColors.SurfaceSubtle
                                 else if (isExtra) GharKhataColors.BrandTerracottaLight
                                 else GharKhataColors.SurfaceCard
                             )
@@ -159,14 +158,14 @@ fun ServicesScreen(
                         Text(text = "${log.dayOfMonth}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GharKhataColors.TextSecondary)
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = if (isBandh) "❌" else "🥛",
+                            text = if (isZero) "🥛" else "🥛",
                             fontSize = 16.sp
                         )
                         Text(
-                            text = if (isBandh) "0L" else log.status.label.replace(" L", "L"),
+                            text = if (isZero) "0L" else log.status.label.replace(" L", "L"),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (isBandh) GharKhataColors.ExpenseRed else GharKhataColors.TextPrimary
+                            color = if (isZero) GharKhataColors.TextMuted else GharKhataColors.TextPrimary
                         )
                     }
                 }
@@ -176,95 +175,202 @@ fun ServicesScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = {
-                    val msg = AutoCalculators.generateMilkWhatsAppSlip(monthName, totalLiters, 66, totalMilkBill)
-                    onSendWhatsApp(msg)
+                    if (totalLiters > 0.0) {
+                        val msg = AutoCalculators.generateMilkWhatsAppSlip(monthName, totalLiters, 66, totalMilkBill)
+                        onSendWhatsApp(msg)
+                    }
                 },
+                enabled = totalLiters > 0.0,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = GharKhataColors.IncomeGreen)
             ) {
-                Text(text = "WhatsApp Par Doodhwale Ko Bhejein", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(
+                    text = if (totalLiters > 0.0) "WhatsApp Par Doodhwale Ko Bhejein" else "Pehle Doodh Log Karein",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
             }
         } else {
-            // --- Staff Screen Content ---
-            var baseSalary by remember { mutableStateOf(4000L) }
-            var absentDays by remember { mutableStateOf(2) }
-            var advanceTaken by remember { mutableStateOf(1000L) }
+            // --- Clean Staff Screen (Zero Demo Data) ---
+            var staffName by remember { mutableStateOf("") }
+            var baseSalary by remember { mutableStateOf(0L) }
+            var absentDays by remember { mutableStateOf(0) }
+            var advanceTaken by remember { mutableStateOf(0L) }
+            var showAddStaffDialog by remember { mutableStateOf(false) }
 
-            val netPayable = remember(baseSalary, absentDays, advanceTaken) {
-                AutoCalculators.calculateStaffPayroll(
-                    monthlySalaryInr = baseSalary,
-                    daysInMonth = daysInMonth,
-                    presentDays = daysInMonth - absentDays,
-                    advanceTakenInr = advanceTaken
+            var inputStaffName by remember { mutableStateOf("") }
+            var inputSalary by remember { mutableStateOf("") }
+
+            if (showAddStaffDialog) {
+                AlertDialog(
+                    onDismissRequest = { showAddStaffDialog = false },
+                    title = { Text("Staff / Helper Jodein", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedTextField(
+                                value = inputStaffName,
+                                onValueChange = { inputStaffName = it },
+                                label = { Text("Naam (e.g. Maid, Cook)") },
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = inputSalary,
+                                onValueChange = { inputSalary = it.filter { ch -> ch.isDigit() } },
+                                label = { Text("Monthly Salary (₹)") },
+                                singleLine = true
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if (inputStaffName.isNotBlank() && inputSalary.isNotBlank()) {
+                                    staffName = inputStaffName.trim()
+                                    baseSalary = inputSalary.toLongOrNull() ?: 0L
+                                    absentDays = 0
+                                    advanceTaken = 0L
+                                    showAddStaffDialog = false
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GharKhataColors.BrandTerracotta)
+                        ) { Text("Save") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showAddStaffDialog = false }) { Text("Cancel") }
+                    }
                 )
             }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = GharKhataColors.SurfaceCard),
-                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GharKhataColors.BorderLight))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Sunita Bai (Jhadu Pocha)", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = GharKhataColors.TextPrimary)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(text = "Tai Monthly Salary: ${AutoCalculators.formatInr(baseSalary)}", fontSize = 13.sp, color = GharKhataColors.TextSecondary)
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = GharKhataColors.BorderLight)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+            if (baseSalary == 0L || staffName.isBlank()) {
+                // Empty state: No hardcoded demo staff
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = GharKhataColors.SurfaceCard),
+                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GharKhataColors.BorderLight))
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(text = "Chhutti (Leaves): $absentDays din", fontSize = 13.sp)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { if (absentDays > 0) absentDays-- },
-                                modifier = Modifier.size(32.dp),
-                                contentPadding = PaddingValues(0.dp)
-                            ) { Text("-") }
-                            Button(
-                                onClick = { absentDays++ },
-                                modifier = Modifier.size(32.dp),
-                                contentPadding = PaddingValues(0.dp)
-                            ) { Text("+") }
+                        Text(text = "🧹", fontSize = 40.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = "Koi Staff / Kamwali Nahi Judi", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "Salary aur chhutti calculate karne ke liye staff jodein.", fontSize = 12.sp, color = GharKhataColors.TextSecondary)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                inputStaffName = ""
+                                inputSalary = ""
+                                showAddStaffDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GharKhataColors.BrandTerracotta)
+                        ) {
+                            Text("+ Staff Jodein")
                         }
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "Advance Diya: ${AutoCalculators.formatInr(advanceTaken)}", fontSize = 13.sp)
-                        Button(
-                            onClick = { advanceTaken += 500L },
-                            shape = RoundedCornerShape(6.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) { Text("+₹500", fontSize = 12.sp) }
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = GharKhataColors.BorderLight)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "1st Ko Dena Hai:", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text(text = AutoCalculators.formatInr(netPayable), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = GharKhataColors.IncomeGreen)
+                }
+            } else {
+                // Configured staff with zero mock leaves or advances
+                val netPayable = remember(baseSalary, absentDays, advanceTaken) {
+                    AutoCalculators.calculateStaffPayroll(
+                        monthlySalaryInr = baseSalary,
+                        daysInMonth = daysInMonth,
+                        presentDays = daysInMonth - absentDays,
+                        advanceTakenInr = advanceTaken
+                    )
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = GharKhataColors.SurfaceCard),
+                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GharKhataColors.BorderLight))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = staffName, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = GharKhataColors.TextPrimary)
+                            TextButton(onClick = {
+                                inputStaffName = staffName
+                                inputSalary = baseSalary.toString()
+                                showAddStaffDialog = true
+                            }) {
+                                Text("Edit", fontSize = 12.sp, color = GharKhataColors.BrandTerracotta)
+                            }
+                        }
+                        Text(text = "Tai Monthly Salary: ${AutoCalculators.formatInr(baseSalary)}", fontSize = 13.sp, color = GharKhataColors.TextSecondary)
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = GharKhataColors.BorderLight)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Chhutti (Leaves): $absentDays din", fontSize = 13.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { if (absentDays > 0) absentDays-- },
+                                    modifier = Modifier.size(32.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) { Text("-") }
+                                Button(
+                                    onClick = { absentDays++ },
+                                    modifier = Modifier.size(32.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) { Text("+") }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Advance Diya: ${AutoCalculators.formatInr(advanceTaken)}", fontSize = 13.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (advanceTaken > 0) {
+                                    OutlinedButton(
+                                        onClick = { advanceTaken = 0L },
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) { Text("Clear", fontSize = 11.sp) }
+                                }
+                                Button(
+                                    onClick = { advanceTaken += 500L },
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                ) { Text("+₹500", fontSize = 12.sp) }
+                            }
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = GharKhataColors.BorderLight)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "1st Ko Dena Hai:", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text(text = AutoCalculators.formatInr(netPayable), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = GharKhataColors.IncomeGreen)
+                        }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.weight(1f))
-            Button(
-                onClick = {
-                    val slip = AutoCalculators.generateStaffSalarySlip("Sunita Bai", monthName, baseSalary, absentDays, advanceTaken, netPayable)
-                    onSendWhatsApp(slip)
-                },
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = GharKhataColors.IncomeGreen)
-            ) {
-                Text(text = "WhatsApp Salary Slip Bhejein", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.weight(1f))
+                Button(
+                    onClick = {
+                        val slip = AutoCalculators.generateStaffSalarySlip(staffName, monthName, baseSalary, absentDays, advanceTaken, netPayable)
+                        onSendWhatsApp(slip)
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GharKhataColors.IncomeGreen)
+                ) {
+                    Text(text = "WhatsApp Salary Slip Bhejein", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
             }
         }
     }

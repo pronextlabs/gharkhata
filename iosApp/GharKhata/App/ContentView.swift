@@ -24,14 +24,55 @@ public struct ContentView: View {
                     Label("Bachat", systemImage: "lock.shield.fill")
                 }
                 .tag(2)
+
+            SettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape.fill")
+                }
+                .tag(3)
         }
         .accentColor(Color(red: 0.77, green: 0.36, blue: 0.24)) // Terracotta
+    }
+}
+
+struct SettingsView: View {
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                Spacer()
+                Text("GharKhata")
+                    .font(.title).bold()
+                    .foregroundColor(Color(red: 0.77, green: 0.36, blue: 0.24))
+                Text("Version 1.0.0")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                Text("Crafted with ❤️ by pronextlabs")
+                    .font(.callout).bold()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color(red: 0.99, green: 0.95, blue: 0.94))
+                    .cornerRadius(20)
+
+                Text("100% Offline • Zero Analytics • Free Public Good")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+
+                Link("Visit pronextlabs on GitHub", destination: URL(string: "https://github.com/pronextlabs/gharkhata")!)
+                    .font(.subheadline).bold()
+                    .padding()
+                Spacer()
+            }
+            .navigationTitle("Settings")
+        }
     }
 }
 
 struct HomeView: View {
     @State private var inputExpression = ""
     @State private var selectedCategory: CategoryType = .vegetables
+    @State private var monthlyBudget = 0
+    @State private var totalSpent = 0
 
     var body: some View {
         NavigationView {
@@ -44,10 +85,10 @@ struct HomeView: View {
                         Text("Aaj Ka Safe Kharcha")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.85))
-                        Text(AutoCalculators.formatInr(420))
+                        Text(AutoCalculators.formatInr(monthlyBudget == 0 ? 0 : max(0, (monthlyBudget - totalSpent) / 30)))
                             .font(.system(size: 38, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
-                        Text("14 din bache hain is mahine mein")
+                        Text(monthlyBudget == 0 ? "Tap to set monthly budget" : "Dynamic daily safe spend")
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.75))
                     }

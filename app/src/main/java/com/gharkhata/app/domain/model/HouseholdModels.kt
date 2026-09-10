@@ -1,16 +1,16 @@
 package com.gharkhata.app.domain.model
 
 enum class MilkStatus(val liters: Double, val label: String) {
+    NO_MILK(0.0, "0 L"),
     FULL_LITER(1.0, "1.0 L"),
     LITER_AND_HALF(1.5, "1.5 L"),
-    TWO_LITERS(2.0, "2.0 L"),
-    NO_MILK(0.0, "Bandh (0 L)");
+    TWO_LITERS(2.0, "2.0 L");
 
     fun next(): MilkStatus = when (this) {
+        NO_MILK -> FULL_LITER
         FULL_LITER -> LITER_AND_HALF
         LITER_AND_HALF -> TWO_LITERS
         TWO_LITERS -> NO_MILK
-        NO_MILK -> FULL_LITER
     }
 }
 
@@ -18,7 +18,7 @@ data class MilkBottleLog(
     val id: Long = 0,
     val dayOfMonth: Int,
     val dateEpochDay: Long,
-    val status: MilkStatus = MilkStatus.FULL_LITER,
+    val status: MilkStatus = MilkStatus.NO_MILK,
     val ratePerLiterInr: Int = 66
 ) {
     val costInr: Long

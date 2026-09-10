@@ -1,6 +1,15 @@
 # GharKhata (घरखाता): Minimalist Offline Household Ledger
 
 <p align="center">
+  <img src="docs/images/gharkhata_logo.png" alt="GharKhata App Icon" width="130" style="border-radius: 26px;" />
+</p>
+
+<p align="center">
+  <strong>GharKhata: Apka Apna Hisaab Kitab</strong><br>
+  <em>100% Offline • Zero Clutter • Privacy-First Household Ledger for Homemakers</em>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Release-v1.0.0-C45B3E?style=for-the-badge&logo=github" alt="Release Version" />
   <img src="https://img.shields.io/badge/Android-API%2026%2B-3DDC84?style=for-the-badge&logo=android" alt="Android" />
   <img src="https://img.shields.io/badge/iOS-16.0%2B-000000?style=for-the-badge&logo=apple" alt="iOS" />

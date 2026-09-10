@@ -13,7 +13,8 @@ import com.gharkhata.app.core.designsystem.GharKhataColors
 enum class AppTab(val title: String, val icon: String) {
     TODAY("Aaj Ka Hisaab", "🏠"),
     SERVICES("Ghar Ke Kaam", "🥛"),
-    SAVINGS("Bachat", "💰")
+    SAVINGS("Bachat", "💰"),
+    SETTINGS("Settings", "⚙️")
 }
 
 @Composable
@@ -64,6 +65,12 @@ fun MainScreen(
             )
             AppTab.SAVINGS -> SavingsScreen(
                 modifier = Modifier.padding(innerPadding)
+            )
+            AppTab.SETTINGS -> SettingsScreen(
+                modifier = Modifier.padding(innerPadding),
+                onSendWhatsAppBackup = {
+                    onSendWhatsApp("📦 *GharKhata Backup*\nBackup generated on ${java.time.LocalDate.now()}\nVisit https://github.com/pronextlabs/gharkhata")
+                }
             )
         }
     }

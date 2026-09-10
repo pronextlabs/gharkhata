@@ -1,5 +1,7 @@
 package com.gharkhata.app.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -14,10 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gharkhata.app.R
 import com.gharkhata.app.core.designsystem.GharKhataColors
 import com.gharkhata.app.core.designsystem.tactileClick
 import com.gharkhata.app.core.util.AutoCalculators
@@ -27,16 +30,20 @@ import java.time.LocalDate
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    monthlyBudgetInr: Long = 25000L,
-    totalSpentInr: Long = 16200L,
+    initialBudgetInr: Long = 0L,
     onSaveTransaction: (CategoryType, Long) -> Unit = { _, _ -> }
 ) {
     val today = remember { LocalDate.now() }
     val daysInMonth = remember { today.lengthOfMonth() }
     val currentDay = remember { today.dayOfMonth }
 
-    val dailySafeSpend = remember(monthlyBudgetInr, totalSpentInr) {
-        AutoCalculators.calculateDailySafeSpend(monthlyBudgetInr, totalSpentInr, daysInMonth, currentDay)
+    var monthlyBudget by remember { mutableStateOf(initialBudgetInr) }
+    var totalSpent by remember { mutableStateOf(0L) }
+    var showBudgetDialog by remember { mutableStateOf(false) }
+    var budgetInput by remember { mutableStateOf("") }
+
+    val dailySafeSpend = remember(monthlyBudget, totalSpent) {
+        AutoCalculators.calculateDailySafeSpend(monthlyBudget, totalSpent, daysInMonth, currentDay)
     }
 
     var selectedCategory by remember { mutableStateOf(CategoryType.VEGETABLES) }
@@ -55,15 +62,116 @@ fun HomeScreen(
         }
     }
 
+    // Budget Configuration Dialog
+    if (showBudgetDialog) {
+        AlertDialog(
+            onDismissRequest = { showBudgetDialog = false },
+            title = { Text(text = "Monthly Budget Set Karein", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = budgetInput,
+                    onValueChange = { budgetInput = it.filter { ch -> ch.isDigit() } },
+                    label = { Text("Kul Mahine Ka Budget (₹)") },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GharKhataColors.BrandTerracotta,
+                        cursorColor = GharKhataColors.BrandTerracotta
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        monthlyBudget = budgetInput.toLongOrNull() ?: 0L
+                        showBudgetDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GharKhataColors.BrandTerracotta)
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBudgetDialog = false }) {
+                    Text("Cancel", color = GharKhataColors.TextSecondary)
+                }
+            }
+        )
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(GharKhataColors.CanvasBone)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        // --- Header Pacer Card ---
+        // --- Branded Top Header with App Logo ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp, top = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_app_logo),
+                    contentDescription = "GharKhata Logo",
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+                Column {
+                    Text(
+                        text = "GharKhata",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GharKhataColors.BrandTerracotta
+                    )
+                    Text(
+                        text = "Apka Apna Hisaab Kitab",
+                        fontSize = 11.sp,
+                        color = GharKhataColors.TextSecondary
+                    )
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = GharKhataColors.IncomeGreenLight,
+                border = BorderStroke(1.dp, GharKhataColors.IncomeGreen.copy(alpha = 0.3f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(GharKhataColors.IncomeGreen)
+                    )
+                    Text(
+                        text = "100% Offline",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = GharKhataColors.IncomeGreen
+                    )
+                }
+            }
+        }
+
+        // --- Header Pacer Card (Click to Set/Edit Budget) ---
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .tactileClick {
+                    budgetInput = if (monthlyBudget > 0L) monthlyBudget.toString() else ""
+                    showBudgetDialog = true
+                },
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = GharKhataColors.BrandTerracotta),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -89,8 +197,11 @@ fun HomeScreen(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${daysInMonth - currentDay + 1} din bache hain is mahine mein",
-                    color = Color.White.copy(alpha = 0.75f),
+                    text = if (monthlyBudget > 0L)
+                        "${daysInMonth - currentDay + 1} din bache hain (Budget: ${AutoCalculators.formatInr(monthlyBudget)})"
+                    else
+                        "Tap karein mahine ka budget set karne ke liye",
+                    color = Color.White.copy(alpha = 0.80f),
                     fontSize = 12.sp
                 )
             }
@@ -211,6 +322,7 @@ fun HomeScreen(
                                         "✓" -> {
                                             if (computedAmount > 0) {
                                                 onSaveTransaction(selectedCategory, computedAmount)
+                                                totalSpent += computedAmount
                                                 lastSavedMessage = "₹$computedAmount jod diya gaya!"
                                                 inputExpression = ""
                                             }
@@ -232,7 +344,7 @@ fun HomeScreen(
             }
         }
 
-        // --- 5-Second Undo Pillow Feedback ---
+        // --- 5-Second Feedback ---
         lastSavedMessage?.let { msg ->
             Spacer(modifier = Modifier.height(10.dp))
             Row(
@@ -241,7 +353,7 @@ fun HomeScreen(
                     .clip(RoundedCornerShape(8.dp))
                     .background(GharKhataColors.IncomeGreenLight)
                     .border(1.dp, GharKhataColors.IncomeGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
