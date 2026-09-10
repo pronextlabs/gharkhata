@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- **Primary Enter Button**: Added a dedicated full-width "Kharcha Jodein (Add Expense)" action button directly below the Mandi keypad.
+- **Screen Scrolling & Overflow**: Replaced unconstrained category grid with deterministic 2-row layout and enabled vertical scrolling for all screen sizes.
+- **Payment Mode Toggle**: Added Cash vs Online UPI 1-tap pill selector.
+- **Mandi Math Evaluation**: Supported multi-addition and subtraction expressions (e.g. `40+60+35`).
+- **Today's Expense Stream**: Displayed recorded transactions for the current day with delete/undo support.
+
 ## [1.0.0] - 2026-09-10
 
 ### Added

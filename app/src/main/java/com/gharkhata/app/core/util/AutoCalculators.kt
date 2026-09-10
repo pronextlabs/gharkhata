@@ -128,4 +128,49 @@ object AutoCalculators {
             Bheja gaya via *GharKhata* (100% Free & Private)
         """.trimIndent()
     }
+
+    /**
+     * Evaluates a Mandi math expression containing numbers and '+' / '-' operators.
+     * e.g., "40+60+35" -> 135
+     * e.g., "100-20" -> 80
+     * e.g., "150" -> 150
+     */
+    fun evaluateMandiExpression(expression: String): Long {
+        if (expression.isBlank()) return 0L
+        try {
+            val sanitized = expression.replace(" ", "")
+            val tokens = mutableListOf<String>()
+            val currentNumber = StringBuilder()
+            for (ch in sanitized) {
+                if (ch == '+' || ch == '-') {
+                    if (currentNumber.isNotEmpty()) {
+                        tokens.add(currentNumber.toString())
+                        currentNumber.clear()
+                    }
+                    tokens.add(ch.toString())
+                } else if (ch.isDigit()) {
+                    currentNumber.append(ch)
+                }
+            }
+            if (currentNumber.isNotEmpty()) {
+                tokens.add(currentNumber.toString())
+            }
+            if (tokens.isEmpty()) return 0L
+            var result = tokens[0].toLongOrNull() ?: 0L
+            var i = 1
+            while (i < tokens.size) {
+                val op = tokens[i]
+                val nextVal = if (i + 1 < tokens.size) tokens[i + 1].toLongOrNull() ?: 0L else 0L
+                if (op == "+") {
+                    result += nextVal
+                } else if (op == "-") {
+                    result -= nextVal
+                }
+                i += 2
+            }
+            return result.coerceAtLeast(0L)
+        } catch (_: Exception) {
+            return 0L
+        }
+    }
 }

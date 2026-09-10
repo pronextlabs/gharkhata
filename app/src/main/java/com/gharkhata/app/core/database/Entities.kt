@@ -3,6 +3,9 @@ package com.gharkhata.app.core.database
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.gharkhata.app.domain.model.CategoryType
+import com.gharkhata.app.domain.model.PaymentMode
+import com.gharkhata.app.domain.model.TransactionItem
 
 @Entity(
     tableName = "transactions",
@@ -17,7 +20,18 @@ data class TransactionEntity(
     val dateEpochDay: Long,
     val isPrivate: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
-)
+) {
+    fun toItem(): TransactionItem = TransactionItem(
+        id = id,
+        amountInr = amountInr,
+        category = CategoryType.fromId(categoryId),
+        paymentMode = if (paymentMode == "ONLINE_UPI") PaymentMode.ONLINE_UPI else PaymentMode.CASH,
+        note = note,
+        dateEpochDay = dateEpochDay,
+        isPrivate = isPrivate,
+        createdAt = createdAt
+    )
+}
 
 @Entity(
     tableName = "milk_logs",

@@ -94,4 +94,17 @@ class AutoCalculatorsTest {
         assertTrue(staffSlip.contains("Sunita Bai"))
         assertTrue(staffSlip.contains("₹ 2,740"))
     }
+
+    @Test
+    fun testEvaluateMandiExpression() {
+        assertEquals(0L, AutoCalculators.evaluateMandiExpression(""))
+        assertEquals(0L, AutoCalculators.evaluateMandiExpression("   "))
+        assertEquals(150L, AutoCalculators.evaluateMandiExpression("150"))
+        assertEquals(135L, AutoCalculators.evaluateMandiExpression("40+60+35"))
+        assertEquals(80L, AutoCalculators.evaluateMandiExpression("100-20"))
+        assertEquals(120L, AutoCalculators.evaluateMandiExpression("40 + 60 + 20"))
+        assertEquals(50L, AutoCalculators.evaluateMandiExpression("50+"))
+        assertEquals(0L, AutoCalculators.evaluateMandiExpression("0"))
+        assertEquals(200L, AutoCalculators.evaluateMandiExpression("150+100-50"))
+    }
 }

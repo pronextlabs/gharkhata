@@ -1,64 +1,137 @@
 package com.gharkhata.app.ui
 
+import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gharkhata.app.R
+import com.gharkhata.app.core.database.GharKhataDatabase
+import com.gharkhata.app.core.database.TransactionEntity
 import com.gharkhata.app.core.designsystem.GharKhataColors
 import com.gharkhata.app.core.designsystem.tactileClick
 import com.gharkhata.app.core.util.AutoCalculators
 import com.gharkhata.app.domain.model.CategoryType
+import com.gharkhata.app.domain.model.PaymentMode
+import com.gharkhata.app.domain.model.TransactionItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
     initialBudgetInr: Long = 0L,
-    onSaveTransaction: (CategoryType, Long) -> Unit = { _, _ -> }
+    onSaveTransaction: (CategoryType, Long) -> Unit = { _, _ -> },
+    onSaveTransactionWithMode: (CategoryType, Long, PaymentMode) -> Unit = { cat, amt, _ -> onSaveTransaction(cat, amt) },
+    onDeleteTransaction: (Long) -> Unit = {}
 ) {
     val today = remember { LocalDate.now() }
     val daysInMonth = remember { today.lengthOfMonth() }
     val currentDay = remember { today.dayOfMonth }
+
+    val context = LocalContext.current
+    val view = LocalView.current
+    val coroutineScope = rememberCoroutineScope()
+    val dao = remember {
+        try {
+            GharKhataDatabase.getInstance(context).dao()
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     var monthlyBudget by remember { mutableStateOf(initialBudgetInr) }
     var totalSpent by remember { mutableStateOf(0L) }
     var showBudgetDialog by remember { mutableStateOf(false) }
     var budgetInput by remember { mutableStateOf("") }
 
+    var selectedCategory by remember { mutableStateOf(CategoryType.VEGETABLES) }
+    var selectedPaymentMode by remember { mutableStateOf(PaymentMode.CASH) }
+    var inputExpression by remember { mutableStateOf("") }
+    var lastSavedMessage by remember { mutableStateOf<String?>(null) }
+
+    val todayTransactions = remember { mutableStateListOf<TransactionItem>() }
+
+    // Observe today's transactions from Room SQLite if available
+    LaunchedEffect(today) {
+        dao?.let { d ->
+            try {
+                d.getTransactionsForDay(today.toEpochDay()).collect { entities ->
+                    todayTransactions.clear()
+                    todayTransactions.addAll(entities.map { it.toItem() })
+                    totalSpent = entities.sumOf { it.amountInr }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     val dailySafeSpend = remember(monthlyBudget, totalSpent) {
         AutoCalculators.calculateDailySafeSpend(monthlyBudget, totalSpent, daysInMonth, currentDay)
     }
 
-    var selectedCategory by remember { mutableStateOf(CategoryType.VEGETABLES) }
-    var inputExpression by remember { mutableStateOf("") }
-    var lastSavedMessage by remember { mutableStateOf<String?>(null) }
-
     val computedAmount = remember(inputExpression) {
-        try {
-            if (inputExpression.isEmpty()) 0L
-            else {
-                val parts = inputExpression.split("+").map { it.trim() }.filter { it.isNotEmpty() }
-                parts.sumOf { it.toLongOrNull() ?: 0L }
+        AutoCalculators.evaluateMandiExpression(inputExpression)
+    }
+
+    val saveExpense = {
+        if (computedAmount > 0) {
+            val amount = computedAmount
+            val cat = selectedCategory
+            val mode = selectedPaymentMode
+            val now = System.currentTimeMillis()
+            val newTx = TransactionItem(
+                id = now,
+                amountInr = amount,
+                category = cat,
+                paymentMode = mode,
+                dateEpochDay = today.toEpochDay(),
+                createdAt = now
+            )
+
+            // If DAO is not present (e.g. tests), update in-memory list directly
+            if (dao == null) {
+                todayTransactions.add(0, newTx)
+                totalSpent += amount
+            } else {
+                coroutineScope.launch(Dispatchers.IO) {
+                    try {
+                        dao.insertTransaction(
+                            TransactionEntity(
+                                amountInr = amount,
+                                categoryId = cat.id,
+                                paymentMode = mode.name,
+                                dateEpochDay = today.toEpochDay(),
+                                createdAt = now
+                            )
+                        )
+                    } catch (_: Exception) {}
+                }
             }
-        } catch (_: Exception) {
-            0L
+
+            onSaveTransactionWithMode(cat, amount, mode)
+            lastSavedMessage = "₹$amount ${cat.titleEn.substringBefore(" ")} jod diya gaya!"
+            inputExpression = ""
+            try {
+                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+            } catch (_: Exception) {}
         }
     }
 
@@ -98,10 +171,13 @@ fun HomeScreen(
         )
     }
 
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(GharKhataColors.CanvasBone)
+            .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         // --- Branded Top Header with App Logo ---
@@ -209,7 +285,7 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // --- Category Selector (Big 64dp Visual Tiles) ---
+        // --- Category Selector (2 Rows of 4 Big Visual Tiles) ---
         Text(
             text = "Kahan Kharcha Hua?",
             color = GharKhataColors.TextPrimary,
@@ -218,41 +294,92 @@ fun HomeScreen(
         )
         Spacer(modifier = Modifier.height(8.dp))
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(CategoryType.entries.toTypedArray()) { cat ->
-                val isSelected = cat == selectedCategory
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) GharKhataColors.BrandTerracottaLight else GharKhataColors.SurfaceCard)
-                        .border(
-                            width = if (isSelected) 2.dp else 1.dp,
-                            color = if (isSelected) GharKhataColors.BrandTerracotta else GharKhataColors.BorderLight,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .tactileClick { selectedCategory = cat }
-                        .padding(vertical = 10.dp, horizontal = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            CategoryType.entries.chunked(4).forEach { rowCats ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(text = cat.emoji, fontSize = 24.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = cat.titleEn.substringBefore(" "),
-                        fontSize = 11.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) GharKhataColors.BrandTerracotta else GharKhataColors.TextPrimary,
-                        maxLines = 1
-                    )
+                    rowCats.forEach { cat ->
+                        val isSelected = cat == selectedCategory
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) GharKhataColors.BrandTerracottaLight else GharKhataColors.SurfaceCard)
+                                .border(
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) GharKhataColors.BrandTerracotta else GharKhataColors.BorderLight,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .tactileClick { selectedCategory = cat }
+                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(text = cat.emoji, fontSize = 24.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = cat.titleEn.substringBefore(" "),
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) GharKhataColors.BrandTerracotta else GharKhataColors.TextPrimary,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // --- Payment Mode Selector (Cash / UPI Pill Toggle) ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(GharKhataColors.SurfaceSubtle)
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (selectedPaymentMode == PaymentMode.CASH) GharKhataColors.SurfaceCard else Color.Transparent)
+                    .tactileClick { selectedPaymentMode = PaymentMode.CASH }
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "💵 Cash (Nagad)",
+                    fontSize = 12.sp,
+                    fontWeight = if (selectedPaymentMode == PaymentMode.CASH) FontWeight.Bold else FontWeight.Normal,
+                    color = if (selectedPaymentMode == PaymentMode.CASH) GharKhataColors.BrandTerracotta else GharKhataColors.TextSecondary
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (selectedPaymentMode == PaymentMode.ONLINE_UPI) GharKhataColors.SurfaceCard else Color.Transparent)
+                    .tactileClick { selectedPaymentMode = PaymentMode.ONLINE_UPI }
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "📱 Online / UPI",
+                    fontSize = 12.sp,
+                    fontWeight = if (selectedPaymentMode == PaymentMode.ONLINE_UPI) FontWeight.Bold else FontWeight.Normal,
+                    color = if (selectedPaymentMode == PaymentMode.ONLINE_UPI) GharKhataColors.BrandTerracotta else GharKhataColors.TextSecondary
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         // --- Mandi Calculator Keypad Display ---
         Row(
@@ -265,12 +392,22 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "${selectedCategory.emoji} ${selectedCategory.titleEn}",
-                color = GharKhataColors.TextSecondary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
+            Column {
+                Text(
+                    text = "${selectedCategory.emoji} ${selectedCategory.titleEn}",
+                    color = GharKhataColors.TextSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                if (inputExpression.contains("+") || inputExpression.contains("-")) {
+                    Text(
+                        text = "= ${AutoCalculators.formatInr(computedAmount)}",
+                        color = GharKhataColors.IncomeGreen,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
             Text(
                 text = if (inputExpression.isEmpty()) "₹ 0" else "₹ $inputExpression",
                 color = GharKhataColors.TextPrimary,
@@ -279,7 +416,7 @@ fun HomeScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // --- Keypad Buttons (Thumb-Zone, 0ms render, Instant Haptic) ---
         val keypadRows = listOf(
@@ -303,7 +440,7 @@ fun HomeScreen(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(52.dp)
+                                .height(50.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
                                     if (isActionKey) GharKhataColors.IncomeGreen
@@ -319,14 +456,7 @@ fun HomeScreen(
                                     when (key) {
                                         "C" -> inputExpression = ""
                                         "⌫" -> if (inputExpression.isNotEmpty()) inputExpression = inputExpression.dropLast(1)
-                                        "✓" -> {
-                                            if (computedAmount > 0) {
-                                                onSaveTransaction(selectedCategory, computedAmount)
-                                                totalSpent += computedAmount
-                                                lastSavedMessage = "₹$computedAmount jod diya gaya!"
-                                                inputExpression = ""
-                                            }
-                                        }
+                                        "✓" -> saveExpense()
                                         else -> inputExpression += key
                                     }
                                 },
@@ -344,7 +474,44 @@ fun HomeScreen(
             }
         }
 
-        // --- 5-Second Feedback ---
+        // --- Primary Action Button: "Kharcha Jodein" (Step 3: Big Green Full-Width Button) ---
+        Spacer(modifier = Modifier.height(10.dp))
+        Button(
+            onClick = { saveExpense() },
+            enabled = computedAmount > 0,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = GharKhataColors.IncomeGreen,
+                disabledContainerColor = GharKhataColors.IncomeGreen.copy(alpha = 0.35f)
+            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "✓",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = if (computedAmount > 0)
+                        "Kharcha Jodein • ${AutoCalculators.formatInr(computedAmount)}"
+                    else
+                        "Kharcha Jodein (Add Expense)",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        }
+
+        // --- 5-Second Feedback with Undo ("Wapas Karein") ---
         lastSavedMessage?.let { msg ->
             Spacer(modifier = Modifier.height(10.dp))
             Row(
@@ -357,11 +524,133 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "✓ $msg", color = GharKhataColors.IncomeGreen, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                TextButton(onClick = { lastSavedMessage = null }) {
-                    Text(text = "Wapas Karein", color = GharKhataColors.IncomeGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(
+                    text = "✓ $msg",
+                    color = GharKhataColors.IncomeGreen,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                TextButton(onClick = {
+                    if (todayTransactions.isNotEmpty()) {
+                        val removed = todayTransactions.removeAt(0)
+                        totalSpent = (totalSpent - removed.amountInr).coerceAtLeast(0L)
+                        coroutineScope.launch(Dispatchers.IO) {
+                            try {
+                                dao?.deleteTransactionById(removed.id)
+                            } catch (_: Exception) {}
+                        }
+                        onDeleteTransaction(removed.id)
+                    }
+                    lastSavedMessage = null
+                }) {
+                    Text(
+                        text = "Wapas Karein",
+                        color = GharKhataColors.IncomeGreen,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
                 }
             }
         }
+
+        // --- Today's Expense Stream ("Aaj Ke Kharche") ---
+        if (todayTransactions.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Aaj Ke Kharche (${todayTransactions.size})",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = GharKhataColors.TextPrimary
+                )
+                Text(
+                    text = "Kul: ${AutoCalculators.formatInr(todayTransactions.sumOf { it.amountInr })}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = GharKhataColors.BrandTerracotta
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                todayTransactions.forEach { tx ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = GharKhataColors.SurfaceCard),
+                        border = CardDefaults.outlinedCardBorder().copy(
+                            brush = androidx.compose.ui.graphics.SolidColor(GharKhataColors.BorderLight)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(text = tx.category.emoji, fontSize = 22.sp)
+                                Column {
+                                    Text(
+                                        text = tx.category.titleEn,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = GharKhataColors.TextPrimary
+                                    )
+                                    Text(
+                                        text = if (tx.paymentMode == PaymentMode.ONLINE_UPI) "Online / UPI" else "Cash",
+                                        fontSize = 11.sp,
+                                        color = GharKhataColors.TextSecondary
+                                    )
+                                }
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "-${AutoCalculators.formatInr(tx.amountInr)}",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GharKhataColors.ExpenseRed
+                                )
+                                IconButton(
+                                    onClick = {
+                                        todayTransactions.remove(tx)
+                                        totalSpent = (totalSpent - tx.amountInr).coerceAtLeast(0L)
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            try {
+                                                dao?.deleteTransactionById(tx.id)
+                                            } catch (_: Exception) {}
+                                        }
+                                        onDeleteTransaction(tx.id)
+                                        if (lastSavedMessage?.contains("₹${tx.amountInr}") == true) {
+                                            lastSavedMessage = null
+                                        }
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Text(
+                                        text = "✕",
+                                        fontSize = 14.sp,
+                                        color = GharKhataColors.TextMuted,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
