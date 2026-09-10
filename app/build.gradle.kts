@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.gharkhata.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.gharkhata.app"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 2
         versionName = "1.1.0"
 

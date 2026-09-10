@@ -14,6 +14,7 @@
 *.apk
 *.aab
 *.ap_
+*.zip
 captures/
 .externalNativeBuild
 .cxx

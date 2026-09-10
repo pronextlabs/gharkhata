@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.1.0] - 2026-09-10
 
 ### Fixed & Enhanced
+- **Modern SDK Upgrade (Android 15)**: Upgraded `targetSdk` and `compileSdk` to 35 (Android 15) to comply with Google Play requirements and resolve outdated OS warnings.
+- **Android Gradle Plugin (AGP 8.6.1)**: Upgraded AGP from 8.4.2 to 8.6.1 for native Android 15 toolchain support.
+- **Edge-to-Edge & Predictive Back**: Implemented `enableEdgeToEdge()` in `MainActivity` and enabled `android:enableOnBackInvokedCallback="true"` in the Android Manifest.
 - **Primary Enter Button**: Added a dedicated full-width "Kharcha Jodein (Add Expense)" action button directly below the Mandi keypad.
 - **Screen Scrolling & Overflow**: Replaced unconstrained category grid with deterministic 2-row layout and enabled vertical scrolling for all screen sizes.
 - **Payment Mode Toggle**: Added Cash vs Online UPI 1-tap pill selector.
