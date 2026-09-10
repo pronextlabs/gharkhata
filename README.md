@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Release-v1.0.0-C45B3E?style=for-the-badge&logo=github" alt="Release Version" />
-  <img src="https://img.shields.io/badge/Android-API%2026%2B-3DDC84?style=for-the-badge&logo=android" alt="Android" />
+  <img src="https://img.shields.io/badge/Release-v1.1.0-C45B3E?style=for-the-badge&logo=github" alt="Release Version" />
+  <img src="https://img.shields.io/badge/Android-15%20(API%2035)-3DDC84?style=for-the-badge&logo=android" alt="Android" />
   <img src="https://img.shields.io/badge/iOS-16.0%2B-000000?style=for-the-badge&logo=apple" alt="iOS" />
   <img src="https://img.shields.io/badge/Architecture-100%25%20Offline%20First-10B981?style=for-the-badge" alt="Offline First" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License" />
@@ -83,7 +83,7 @@ GharKhata addresses the real-world daily financial workflows of Indian household
 
 | Dimension | Android (`/app`) | iOS (`/iosApp`) |
 | :--- | :--- | :--- |
-| **Language** | Kotlin 1.9+ / JVM 17 | Swift 5.9+ |
+| **Language** | Kotlin 2.0+ / JVM 17 | Swift 5.9+ |
 | **UI Framework** | Jetpack Compose + Material 3 | SwiftUI |
 | **Local Storage** | Room Database (SQLite) + DataStore | CoreData / Local JSON Store |
 | **Haptics** | AndroidX HapticFeedbackConstants | UIImpactFeedbackGenerator |

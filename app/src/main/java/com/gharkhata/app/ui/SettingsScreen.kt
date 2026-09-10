@@ -70,7 +70,7 @@ fun SettingsScreen(
                         color = GharKhataColors.BrandTerracotta
                     )
                     Text(
-                        text = "Version 1.0.0 (Production Release)",
+                        text = "Version 1.1.0 (Production Release)",
                         fontSize = 12.sp,
                         color = GharKhataColors.TextSecondary
                     )
