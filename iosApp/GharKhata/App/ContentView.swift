@@ -43,7 +43,7 @@ struct SettingsView: View {
                 Text("GharKhata")
                     .font(.title).bold()
                     .foregroundColor(Color(red: 0.77, green: 0.36, blue: 0.24))
-                Text("Version 1.0.0")
+                Text("Version 1.1.0")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 

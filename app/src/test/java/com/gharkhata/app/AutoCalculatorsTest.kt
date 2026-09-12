@@ -106,5 +106,31 @@ class AutoCalculatorsTest {
         assertEquals(50L, AutoCalculators.evaluateMandiExpression("50+"))
         assertEquals(0L, AutoCalculators.evaluateMandiExpression("0"))
         assertEquals(200L, AutoCalculators.evaluateMandiExpression("150+100-50"))
+        assertEquals(0L, AutoCalculators.evaluateMandiExpression("invalid"))
+        assertEquals(75L, AutoCalculators.evaluateMandiExpression("  25 + 50  "))
+    }
+
+    @Test
+    fun testDailySafeSpendWithMonthCumulativeSpending() {
+        // ₹30,000 budget, spent ₹21,000 so far over first 20 days of 30-day month (11 days remaining: 20..30)
+        // Remaining budget = 9,000 / 11 = 818
+        val safeSpend = AutoCalculators.calculateDailySafeSpend(
+            monthlyBudgetInr = 30000L,
+            totalSpentInr = 21000L,
+            daysInMonth = 30,
+            currentDayOfMonth = 20
+        )
+        assertEquals(818L, safeSpend)
+
+        // Last day of month (currentDay = 30, daysInMonth = 30) -> remainingDays = 1
+        // Remaining budget = 1,500 / 1 = 1,500
+        val lastDaySpend = AutoCalculators.calculateDailySafeSpend(
+            monthlyBudgetInr = 25000L,
+            totalSpentInr = 23500L,
+            daysInMonth = 30,
+            currentDayOfMonth = 30
+        )
+        assertEquals(1500L, lastDaySpend)
     }
 }
+

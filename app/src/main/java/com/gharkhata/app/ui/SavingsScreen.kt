@@ -17,20 +17,34 @@ import com.gharkhata.app.core.designsystem.GharKhataColors
 import com.gharkhata.app.core.util.AutoCalculators
 import com.gharkhata.app.domain.model.CashGalla
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.fragment.app.FragmentActivity
+import com.gharkhata.app.core.util.BiometricAuthHelper
+import com.gharkhata.app.core.util.GharKhataPreferences
+
 @Composable
 fun SavingsScreen(
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var isTijoriUnlocked by remember { mutableStateOf(false) }
-    var tijoriAmount by remember { mutableStateOf(0L) }
+    var tijoriAmount by remember { mutableStateOf(GharKhataPreferences.getTijoriAmount(context)) }
     var showTijoriDialog by remember { mutableStateOf(false) }
     var tijoriInput by remember { mutableStateOf("") }
 
-    // All note counts start at 0 (zero demo data)
-    var n500 by remember { mutableStateOf(0) }
-    var n200 by remember { mutableStateOf(0) }
-    var n100 by remember { mutableStateOf(0) }
-    var n50 by remember { mutableStateOf(0) }
+    val initialCounts = remember { GharKhataPreferences.getCashCounts(context) }
+    var n500 by remember { mutableStateOf(initialCounts[0]) }
+    var n200 by remember { mutableStateOf(initialCounts[1]) }
+    var n100 by remember { mutableStateOf(initialCounts[2]) }
+    var n50 by remember { mutableStateOf(initialCounts[3]) }
+
+    val updateCash = { c500: Int, c200: Int, c100: Int, c50: Int ->
+        n500 = c500
+        n200 = c200
+        n100 = c100
+        n50 = c50
+        GharKhataPreferences.setCashCounts(context, c500, c200, c100, c50)
+    }
 
     val galla = remember(n500, n200, n100, n50) {
         CashGalla(note500 = n500, note200 = n200, note100 = n100, note50 = n50)
@@ -51,7 +65,9 @@ fun SavingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        tijoriAmount = tijoriInput.toLongOrNull() ?: 0L
+                        val newAmount = tijoriInput.toLongOrNull() ?: 0L
+                        tijoriAmount = newAmount
+                        GharKhataPreferences.setTijoriAmount(context, newAmount)
                         showTijoriDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = GharKhataColors.BrandTerracotta)
@@ -85,7 +101,24 @@ fun SavingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(text = "🔒 Gupt Tijori (Private Vault)", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = GharKhataColors.TextPrimary)
-                        TextButton(onClick = { isTijoriUnlocked = !isTijoriUnlocked }) {
+                        TextButton(onClick = {
+                            if (isTijoriUnlocked) {
+                                isTijoriUnlocked = false
+                            } else {
+                                val activity = context as? FragmentActivity
+                                if (activity != null) {
+                                    BiometricAuthHelper.authenticate(
+                                        activity = activity,
+                                        title = "Gupt Tijori Kholein",
+                                        subtitle = "Biometric ya Device PIN se unlock karein",
+                                        onSuccess = { isTijoriUnlocked = true },
+                                        onError = { /* Keep locked */ }
+                                    )
+                                } else {
+                                    isTijoriUnlocked = true
+                                }
+                            }
+                        }) {
                             Text(text = if (isTijoriUnlocked) "Chhupayein (Lock)" else "Kholein (Unlock)", fontSize = 12.sp, color = GharKhataColors.BrandTerracotta)
                         }
                     }
@@ -140,10 +173,30 @@ fun SavingsScreen(
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = GharKhataColors.BorderLight)
 
-                    DenominationRow(label = "₹ 500", count = n500, onMinus = { if (n500 > 0) n500-- }, onPlus = { n500++ })
-                    DenominationRow(label = "₹ 200", count = n200, onMinus = { if (n200 > 0) n200-- }, onPlus = { n200++ })
-                    DenominationRow(label = "₹ 100", count = n100, onMinus = { if (n100 > 0) n100-- }, onPlus = { n100++ })
-                    DenominationRow(label = "₹ 50", count = n50, onMinus = { if (n50 > 0) n50-- }, onPlus = { n50++ })
+                    DenominationRow(
+                        label = "₹ 500",
+                        count = n500,
+                        onMinus = { if (n500 > 0) updateCash(n500 - 1, n200, n100, n50) },
+                        onPlus = { updateCash(n500 + 1, n200, n100, n50) }
+                    )
+                    DenominationRow(
+                        label = "₹ 200",
+                        count = n200,
+                        onMinus = { if (n200 > 0) updateCash(n500, n200 - 1, n100, n50) },
+                        onPlus = { updateCash(n500, n200 + 1, n100, n50) }
+                    )
+                    DenominationRow(
+                        label = "₹ 100",
+                        count = n100,
+                        onMinus = { if (n100 > 0) updateCash(n500, n200, n100 - 1, n50) },
+                        onPlus = { updateCash(n500, n200, n100 + 1, n50) }
+                    )
+                    DenominationRow(
+                        label = "₹ 50",
+                        count = n50,
+                        onMinus = { if (n50 > 0) updateCash(n500, n200, n100, n50 - 1) },
+                        onPlus = { updateCash(n500, n200, n100, n50 + 1) }
+                    )
                 }
             }
         }

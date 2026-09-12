@@ -15,11 +15,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import com.gharkhata.app.core.database.GharKhataDatabase
+import com.gharkhata.app.core.database.MilkLogEntity
+import com.gharkhata.app.core.database.StaffEntity
 import com.gharkhata.app.core.designsystem.GharKhataColors
 import com.gharkhata.app.core.designsystem.tactileClick
 import com.gharkhata.app.core.util.AutoCalculators
 import com.gharkhata.app.domain.model.MilkBottleLog
 import com.gharkhata.app.domain.model.MilkStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @Composable
@@ -29,6 +35,16 @@ fun ServicesScreen(
 ) {
     var activeSubTab by remember { mutableStateOf("MILK") } // MILK or STAFF
 
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val dao = remember {
+        try {
+            GharKhataDatabase.getInstance(context).dao()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     val today = remember { LocalDate.now() }
     val daysInMonth = remember { today.lengthOfMonth() }
     val monthName = remember { today.month.name.lowercase().replaceFirstChar { it.uppercase() } }
@@ -37,8 +53,33 @@ fun ServicesScreen(
     val milkLogs = remember {
         mutableStateListOf<MilkBottleLog>().apply {
             for (day in 1..daysInMonth) {
-                add(MilkBottleLog(dayOfMonth = day, dateEpochDay = day.toLong(), status = MilkStatus.NO_MILK))
+                val epoch = today.withDayOfMonth(day).toEpochDay()
+                add(MilkBottleLog(dayOfMonth = day, dateEpochDay = epoch, status = MilkStatus.NO_MILK))
             }
+        }
+    }
+
+    // Load persisted milk logs from Room SQLite
+    LaunchedEffect(today) {
+        dao?.let { d ->
+            try {
+                d.getAllMilkLogs().collect { entities ->
+                    val map = entities.associateBy { it.dateEpochDay }
+                    for (index in milkLogs.indices) {
+                        val day = milkLogs[index].dayOfMonth
+                        val epoch = today.withDayOfMonth(day).toEpochDay()
+                        map[epoch]?.let { ent ->
+                            val status = when {
+                                ent.liters >= 2.0 -> MilkStatus.TWO_LITERS
+                                ent.liters >= 1.5 -> MilkStatus.LITER_AND_HALF
+                                ent.liters >= 1.0 -> MilkStatus.FULL_LITER
+                                else -> MilkStatus.NO_MILK
+                            }
+                            milkLogs[index] = milkLogs[index].copy(status = status, dateEpochDay = epoch)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -150,7 +191,23 @@ fun ServicesScreen(
                             )
                             .border(1.dp, GharKhataColors.BorderLight, RoundedCornerShape(8.dp))
                             .tactileClick {
-                                milkLogs[index] = log.copy(status = log.status.next())
+                                val nextStatus = log.status.next()
+                                val epoch = today.withDayOfMonth(log.dayOfMonth).toEpochDay()
+                                milkLogs[index] = log.copy(status = nextStatus, dateEpochDay = epoch)
+                                dao?.let { d ->
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        try {
+                                            d.insertOrUpdateMilkLog(
+                                                MilkLogEntity(
+                                                    dateEpochDay = epoch,
+                                                    dayOfMonth = log.dayOfMonth,
+                                                    liters = nextStatus.liters,
+                                                    ratePerLiterInr = 66
+                                                )
+                                            )
+                                        } catch (_: Exception) {}
+                                    }
+                                }
                             }
                             .padding(vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -192,7 +249,8 @@ fun ServicesScreen(
                 )
             }
         } else {
-            // --- Clean Staff Screen (Zero Demo Data) ---
+            // --- Clean Staff Screen (Backed by Room SQLite) ---
+            val activeStaffList = remember { mutableStateListOf<StaffEntity>() }
             var staffName by remember { mutableStateOf("") }
             var baseSalary by remember { mutableStateOf(0L) }
             var absentDays by remember { mutableStateOf(0) }
@@ -201,6 +259,22 @@ fun ServicesScreen(
 
             var inputStaffName by remember { mutableStateOf("") }
             var inputSalary by remember { mutableStateOf("") }
+
+            LaunchedEffect(Unit) {
+                dao?.let { d ->
+                    try {
+                        d.getActiveStaff().collect { list ->
+                            activeStaffList.clear()
+                            activeStaffList.addAll(list)
+                            if (list.isNotEmpty()) {
+                                staffName = list[0].name
+                                baseSalary = list[0].monthlySalaryInr
+                                advanceTaken = list[0].advanceBalanceInr
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
 
             if (showAddStaffDialog) {
                 AlertDialog(
@@ -226,11 +300,30 @@ fun ServicesScreen(
                         Button(
                             onClick = {
                                 if (inputStaffName.isNotBlank() && inputSalary.isNotBlank()) {
-                                    staffName = inputStaffName.trim()
-                                    baseSalary = inputSalary.toLongOrNull() ?: 0L
+                                    val sName = inputStaffName.trim()
+                                    val sSalary = inputSalary.toLongOrNull() ?: 0L
+                                    staffName = sName
+                                    baseSalary = sSalary
                                     absentDays = 0
                                     advanceTaken = 0L
                                     showAddStaffDialog = false
+                                    dao?.let { d ->
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            try {
+                                                val existing = activeStaffList.firstOrNull()
+                                                d.insertStaff(
+                                                    StaffEntity(
+                                                        id = existing?.id ?: 0L,
+                                                        name = sName,
+                                                        role = "Household Help",
+                                                        monthlySalaryInr = sSalary,
+                                                        advanceBalanceInr = 0L,
+                                                        isActive = true
+                                                    )
+                                                )
+                                            } catch (_: Exception) {}
+                                        }
+                                    }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = GharKhataColors.BrandTerracotta)
@@ -335,13 +428,37 @@ fun ServicesScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 if (advanceTaken > 0) {
                                     OutlinedButton(
-                                        onClick = { advanceTaken = 0L },
+                                        onClick = {
+                                            advanceTaken = 0L
+                                            dao?.let { d ->
+                                                val existing = activeStaffList.firstOrNull()
+                                                if (existing != null) {
+                                                    coroutineScope.launch(Dispatchers.IO) {
+                                                        try {
+                                                            d.insertStaff(existing.copy(advanceBalanceInr = 0L))
+                                                        } catch (_: Exception) {}
+                                                    }
+                                                }
+                                            }
+                                        },
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                                     ) { Text("Clear", fontSize = 11.sp) }
                                 }
                                 Button(
-                                    onClick = { advanceTaken += 500L },
+                                    onClick = {
+                                        advanceTaken += 500L
+                                        dao?.let { d ->
+                                            val sId = activeStaffList.firstOrNull()?.id ?: 0L
+                                            if (sId > 0L) {
+                                                coroutineScope.launch(Dispatchers.IO) {
+                                                    try {
+                                                        d.addAdvance(sId, 500L)
+                                                    } catch (_: Exception) {}
+                                                }
+                                            }
+                                        }
+                                    },
                                     shape = RoundedCornerShape(6.dp),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                                 ) { Text("+₹500", fontSize = 12.sp) }

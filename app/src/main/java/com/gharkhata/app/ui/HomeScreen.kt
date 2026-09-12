@@ -35,6 +35,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+import com.gharkhata.app.core.util.GharKhataPreferences
+
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -46,6 +48,8 @@ fun HomeScreen(
     val today = remember { LocalDate.now() }
     val daysInMonth = remember { today.lengthOfMonth() }
     val currentDay = remember { today.dayOfMonth }
+    val firstDayOfMonthEpoch = remember { today.withDayOfMonth(1).toEpochDay() }
+    val todayEpoch = remember { today.toEpochDay() }
 
     val context = LocalContext.current
     val view = LocalView.current
@@ -58,7 +62,11 @@ fun HomeScreen(
         }
     }
 
-    var monthlyBudget by remember { mutableStateOf(initialBudgetInr) }
+    var monthlyBudget by remember {
+        mutableStateOf(
+            if (initialBudgetInr > 0L) initialBudgetInr else GharKhataPreferences.getMonthlyBudget(context)
+        )
+    }
     var totalSpent by remember { mutableStateOf(0L) }
     var showBudgetDialog by remember { mutableStateOf(false) }
     var budgetInput by remember { mutableStateOf("") }
@@ -70,16 +78,24 @@ fun HomeScreen(
 
     val todayTransactions = remember { mutableStateListOf<TransactionItem>() }
 
-    // Observe today's transactions from Room SQLite if available
+    // Observe today's transactions and month-to-date total spending from Room SQLite
     LaunchedEffect(today) {
         dao?.let { d ->
-            try {
-                d.getTransactionsForDay(today.toEpochDay()).collect { entities ->
-                    todayTransactions.clear()
-                    todayTransactions.addAll(entities.map { it.toItem() })
-                    totalSpent = entities.sumOf { it.amountInr }
-                }
-            } catch (_: Exception) {}
+            launch {
+                try {
+                    d.getTransactionsForDay(todayEpoch).collect { entities ->
+                        todayTransactions.clear()
+                        todayTransactions.addAll(entities.map { it.toItem() })
+                    }
+                } catch (_: Exception) {}
+            }
+            launch {
+                try {
+                    d.getMonthlySpendSum(firstDayOfMonthEpoch, todayEpoch).collect { sum ->
+                        totalSpent = sum ?: 0L
+                    }
+                } catch (_: Exception) {}
+            }
         }
     }
 
@@ -155,7 +171,9 @@ fun HomeScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        monthlyBudget = budgetInput.toLongOrNull() ?: 0L
+                        val newBudget = budgetInput.toLongOrNull() ?: 0L
+                        monthlyBudget = newBudget
+                        GharKhataPreferences.setMonthlyBudget(context, newBudget)
                         showBudgetDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = GharKhataColors.BrandTerracotta)
